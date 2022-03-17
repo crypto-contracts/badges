@@ -14,6 +14,9 @@ contract Badge {
     mapping(uint256 => uint8) private _ownersOfRole;
     mapping(uint8 => mapping(uint256 => uint256)) private _balances;
 
+    // {eventKey: {tokenID : was minted}}
+    mapping (uint32 => mapping (bytes => bool)) private _hasMinted;
+
     event Transfer(
         uint256 indexed from,
         uint8 roleIndex,
@@ -27,6 +30,11 @@ contract Badge {
         uint256 indexed tokenId,
         uint32 value,
         uint32 eventKey
+    );
+
+    event Cleared(
+        uint256 indexed tokenId,
+        uint32 indexed value
     );
 
     constructor() {
@@ -54,7 +62,7 @@ contract Badge {
         roles[index] = role;
     }
 
-    function setSymoblMap(uint32 eventKey, string memory achievement) external {
+    function setAchievements(uint32 eventKey, string memory achievement) external {
         achievements[eventKey] = achievement;
     }
 
@@ -62,19 +70,32 @@ contract Badge {
         return _owners[tokenId] != uint256(0);
     }
 
+    function _encode(uint8 roleIndex, uint to) internal pure returns (bytes memory) {
+        return abi.encodePacked(roleIndex, to);
+    }
+
+    function hasMinted(uint8 roleIndex, uint to, uint32 eventKey) external view returns(bool){
+        bytes memory cha = _encode(roleIndex, to);
+
+        return _hasMinted[eventKey][cha];
+    }
+
     function mint(uint8 roleIndex, uint to, uint32 value, uint32 eventKey) external {
+        bytes memory cha = _encode(roleIndex, to);
+        require(!_hasMinted[eventKey][cha], "Has minted");
         counter ++;
         points[counter] = value;
         events[counter] = eventKey;
 
+        _hasMinted[eventKey][cha] = true;
         _mint(roleIndex, to, counter);
 
         emit Minted(roleIndex, to, counter, value, eventKey);
     }
 
     function _mint(uint8 roleIndex, uint256 to, uint256 tokenId) internal {
-        require(roles[roleIndex] != address(0), "MERC721: mint to the zero tokenID");
-        require(to != uint256(0), "MERC721: mint to the nonexistent role");
+        require(roles[roleIndex] != address(0), "MERC721: mint to the nonexistent role");
+        require(to != uint256(0), "MERC721: mint to the zero tokenId");
         require(!_exists(tokenId), "MERC721: token already minted");
 
         _balances[roleIndex][to] += 1;
@@ -84,9 +105,18 @@ contract Badge {
         emit Transfer(uint256(0), roleIndex, to, tokenId);
     }
 
-    function burn(uint tokenID) external{
-        require(_exists(tokenID), "MERC721: token not minted");
-        _burn(tokenID);
+    function clearPoints(uint256 tokenId) external {
+        require(_exists(tokenId), "MERC721: token not minted");
+        require(points[tokenId] > 0, "Has been cleared");
+
+        uint32 value = points[tokenId];
+        points[tokenId] = 0;
+        emit Cleared(tokenId, value);
+    }
+
+    function burn(uint tokenId) external{
+        require(_exists(tokenId), "MERC721: token not minted");
+        _burn(tokenId);
     }
 
     function _burn(uint256 tokenId) internal {

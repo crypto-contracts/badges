@@ -20,6 +20,7 @@ contract HatchingBadge {
     address immutable public badge;
     address immutable public breeding;
     address immutable public monsterV1;
+    // Monster genesis
     uint8 constant private roleIndex = 2;
     mapping (uint32 => uint32) eventValue;
 
@@ -33,18 +34,21 @@ contract HatchingBadge {
         eventValue[3] = 1230;
     }
 
+    function isClaimable(uint32 eventKey, uint tokenId) public view returns(bool){
+        if(eventKey == 1) {
+            return IBreeding(breeding).generation(tokenId) >= 1;
+        }else if(eventKey == 2) {
+            return IBreeding(breeding).generation(tokenId) >= 5;
+        }else if(eventKey == 3) {
+            return IBreeding(breeding).generation(tokenId) >= 10;
+        }
+
+        return false;
+    }
+
     function claim(uint32 eventKey, uint tokenId) external {
         require(_isApprovedOrOwner(msg.sender, tokenId), "Not approved");
-
-        if(eventKey == 1) {
-            require(IBreeding(breeding).generation(tokenId) >= 1, "not met condition");
-        }else if(eventKey == 2) {
-            require(IBreeding(breeding).generation(tokenId) >= 5, "not met condition");
-        }else if(eventKey == 3) {
-            require(IBreeding(breeding).generation(tokenId) >= 10, "not met condition");
-        }else {
-            revert("error event key");
-        }
+        require(isClaimable(eventKey, tokenId), "not met condition");
 
         IBadge(badge).mint(roleIndex, tokenId, eventValue[eventKey], eventKey);
     }

@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-contract Badge {
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+contract Badge is AccessControl{
     mapping(uint8 => address) public roles;
 
     mapping(uint => uint32) public events;
@@ -37,7 +39,13 @@ contract Badge {
         uint32 indexed value
     );
 
-    constructor() {
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+    bytes32 public constant UPDATE_ROLE = keccak256("UPDATE_ROLE");
+
+    constructor(address safe) {
+        _setupRole(DEFAULT_ADMIN_ROLE, safe);
+
         // rarity
         roles[1] = 0xce761D788DF608BD21bdd59d6f4B54b2e27F25Bb;
         // monster genesis
@@ -45,24 +53,19 @@ contract Badge {
         // monster reborn
         roles[3] = 0x881c9c392F4E02Dd599dE22CaDAa98977c4CFB90;
 
-        achievements[1] = "the first time parent";
-        achievements[2] = "big family";
-        achievements[3] = "the great parent";
-        achievements[4] = "the first time miner mine season I";
-        achievements[5] = "busy miner mine season I";
-        achievements[6] = "brave explorer mine season I";
-        achievements[7] = "conantur repugnare mine season II";
-        achievements[8] = "brave explorer mine season II";
-        achievements[9] = "confident beast mine season II";
-        achievements[10] = "monster hunter mine season II";
-        achievements[11] = "gatekeeper mine season II";
+        achievements[1] = "First Time Being Parent";
+        achievements[2] = "Big Family";
+        achievements[3] = "The Great Parent";
+        achievements[4] = "First Time To Explore";
+        achievements[5] = "Busy Miner";
+        achievements[6] = "Busy Explorer";
     }
 
-    function setRole(uint8 index, address role) external{
+    function setRole(uint8 index, address role) external onlyRole(UPDATE_ROLE) {
         roles[index] = role;
     }
 
-    function setAchievements(uint32 eventKey, string memory achievement) external {
+    function setAchievements(uint32 eventKey, string memory achievement) external onlyRole(UPDATE_ROLE) {
         achievements[eventKey] = achievement;
     }
 
@@ -80,7 +83,7 @@ contract Badge {
         return _hasMinted[eventKey][cha];
     }
 
-    function mint(uint8 roleIndex, uint to, uint32 value, uint32 eventKey) external {
+    function mint(uint8 roleIndex, uint to, uint32 value, uint32 eventKey) external onlyRole(MINTER_ROLE){
         bytes memory cha = _encode(roleIndex, to);
         require(!_hasMinted[eventKey][cha], "Has minted");
         counter ++;
@@ -105,7 +108,7 @@ contract Badge {
         emit Transfer(uint256(0), roleIndex, to, tokenId);
     }
 
-    function clearPoints(uint256 tokenId) external {
+    function clearPoints(uint256 tokenId) external onlyRole(UPDATE_ROLE){
         require(_exists(tokenId), "MERC721: token not minted");
         require(points[tokenId] > 0, "Has been cleared");
 
@@ -114,7 +117,7 @@ contract Badge {
         emit Cleared(tokenId, value);
     }
 
-    function burn(uint tokenId) external{
+    function burn(uint tokenId) external onlyRole(BURNER_ROLE){
         require(_exists(tokenId), "MERC721: token not minted");
         _burn(tokenId);
     }

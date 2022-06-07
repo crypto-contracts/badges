@@ -3,12 +3,26 @@ pragma solidity ^0.8.10;
 
 interface IERC721 {
     function ownerOf(uint256 tokenId) external view returns (address owner);
-    function getApproved(uint256 tokenId) external view returns (address operator);
-    function isApprovedForAll(address owner, address operator) external view returns (bool);
+
+    function getApproved(uint256 tokenId)
+        external
+        view
+        returns (address operator);
+
+    function isApprovedForAll(address owner, address operator)
+        external
+        view
+        returns (bool);
 }
 
 interface IBadge {
-    function mint(uint8 roleIndex, uint to, uint32 value, uint32 eventKey) external;
+    function mint(
+        uint8 roleIndex,
+        uint256 to,
+        uint32 value,
+        uint32 eventKey
+    ) external;
+
     function roles(uint8 roleIndex) external view returns (address);
 }
 
@@ -44,16 +58,24 @@ library MerkleProof {
      *
      * _Available since v4.4._
      */
-    function processProof(bytes32[] memory proof, bytes32 leaf) internal pure returns (bytes32) {
+    function processProof(bytes32[] memory proof, bytes32 leaf)
+        internal
+        pure
+        returns (bytes32)
+    {
         bytes32 computedHash = leaf;
         for (uint256 i = 0; i < proof.length; i++) {
             bytes32 proofElement = proof[i];
             if (computedHash <= proofElement) {
                 // Hash(current computed hash + current element of the proof)
-                computedHash = keccak256(abi.encodePacked(computedHash, proofElement));
+                computedHash = keccak256(
+                    abi.encodePacked(computedHash, proofElement)
+                );
             } else {
                 // Hash(current element of the proof + current computed hash)
-                computedHash = keccak256(abi.encodePacked(proofElement, computedHash));
+                computedHash = keccak256(
+                    abi.encodePacked(proofElement, computedHash)
+                );
             }
         }
         return computedHash;
@@ -71,28 +93,47 @@ contract MintBadge {
         badge = badge_;
     }
 
-    function claim_(uint8 roleIndex, uint tokenId, uint32 eventKey, bytes32[] calldata _merkleProof) external {
-        bytes32 merkleRoot = 0xfc7d2cab404b56ec2f802898ce31ea9f68ee6ff1bde24dd1b78ea689c8867acf;
+    function claim_(
+        uint8 roleIndex,
+        uint256 tokenId,
+        uint32 eventKey,
+        bytes32[] calldata _merkleProof
+    ) external {
+        bytes32 merkleRoot = 0xc4aa592ea71eb67ce5800208d4fa40d5382dc1f6f7efc26041da662b8742cca9;
 
         uint32 value;
         // 10: mining3 auction
+        // 11: mining3 badge
         if (eventKey == 10) {
             value = 40;
+        } else if (eventKey == 11) {
+            value = 10;
         }
 
         address role = IBadge(badge).roles(roleIndex);
 
-        require(_isApprovedOrOwner(msg.sender, tokenId, role), 'Not approved');
+        require(_isApprovedOrOwner(msg.sender, tokenId, role), "Not approved");
 
-        bytes32 node = keccak256(abi.encodePacked(roleIndex, tokenId, eventKey));
+        bytes32 node = keccak256(
+            abi.encodePacked(roleIndex, tokenId, eventKey)
+        );
 
-        require(MerkleProof.verify(_merkleProof, merkleRoot, node), 'Invalid proof');
-        
+        require(
+            MerkleProof.verify(_merkleProof, merkleRoot, node),
+            "Invalid proof"
+        );
+
         IBadge(badge).mint(roleIndex, tokenId, value, eventKey);
     }
 
-    function _isApprovedOrOwner(address operator, uint256 tokenId, address role) private view returns (bool) {
+    function _isApprovedOrOwner(
+        address operator,
+        uint256 tokenId,
+        address role
+    ) private view returns (bool) {
         address TokenOwner = IERC721(role).ownerOf(tokenId);
-        return (operator == TokenOwner || IERC721(role).getApproved(tokenId) == operator || IERC721(role).isApprovedForAll(TokenOwner, operator));
+        return (operator == TokenOwner ||
+            IERC721(role).getApproved(tokenId) == operator ||
+            IERC721(role).isApprovedForAll(TokenOwner, operator));
     }
 }
